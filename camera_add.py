@@ -11,6 +11,7 @@ import sys
 import json
 import numpy as np
 import pandas as pd
+from threading import Thread
 
 class VideoCamera(object):
     def __init__(self):
@@ -31,6 +32,17 @@ class VideoCamera(object):
         # self.video = cv2.VideoCapture('video.mp4')
     
     def __del__(self):
+        f = open('./facerec_128D.txt','r+');
+        data_set = json.loads(f.read());
+
+        for pos in self.person_imgs: #there r some exceptions here, but I'll just leave it as this to keep it simple
+            self.person_features[pos] = [np.mean(self.extract_feature.get_features(self.person_imgs[pos]),axis=0).tolist()]
+        data_set["your_name"] = self.person_features;
+        f = open('./facerec_128D.txt', 'w+');
+        f.write(json.dumps(data_set))
+
+        print('Saved')
+
         self.video.release()
     
     def get_frame(self):
@@ -57,17 +69,27 @@ class VideoCamera(object):
         return jpeg.tobytes()
 
 
+
+
 def gen(camera):
-    while True:
+    global recording
+    recording = True
+
+    def waitsec(sec=10):
+        print(f'Start {sec} seconds')
+        global recording
+        for i in range(sec):
+            #...
+            time.sleep(1)
+        print('Finish')
+        recording = False
+
+    Thread(target=waitsec, args=[5]).start()
+    
+    while recording:
         frame = camera.get_frame()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
 
-    f = open('./facerec_128D.txt','r+');
-    data_set = json.loads(f.read());
 
-    for pos in camera.person_imgs: #there r some exceptions here, but I'll just leave it as this to keep it simple
-        camera.person_features[pos] = [np.mean(camera.extract_feature.get_features(person_imgs[pos]),axis=0).tolist()]
-    data_set[new_name] = camera.person_features;
-    f = open('./facerec_128D.txt', 'w+');
-    f.write(json.dumps(data_set))
+    print("Done")
